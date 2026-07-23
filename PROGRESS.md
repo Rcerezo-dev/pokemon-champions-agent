@@ -33,5 +33,35 @@ Discrepancias de datos encontradas:
 
 ---
 
+## Fase 2 — Scraper del Regulation Set activo
+Estado: completa
+
+Hecho:
+- Investigación previa de las 3 fuentes candidatas del roadmap antes de escribir código (`robots.txt` de las tres, estructura real de cada página):
+  - **Bulbapedia**: fuente principal. Se scrapea vía wikitext crudo de MediaWiki (`action=raw`), no HTML renderizado — mucho más estable (`{{RegulationSetInfobox}}` para fechas, `{{CPCard|dex|nombre|ig=...}}` para el roster). `Crawl-delay: 5` de su `robots.txt` respetado con `time.sleep`.
+  - **Victory Road**: solo se usa para contrastar nombre/fechas/`mega_allowed` (una frase de texto parseable por regex). Su roster son imágenes, no texto — no sirve para contrastar Pokémon individuales.
+  - **Pokémon-Zone**: segunda fuente para contrastar el roster Pokémon-por-Pokémon. Bloquea `httpx` con 403 incluso con User-Agent de navegador y HTTP/2 (fingerprint TLS de Cloudflare, no las cabeceras) — confirmado con pruebas directas. `curl` sí pasa, así que ese scraper hace `subprocess` a `curl` en vez de añadir una dependencia nueva tipo `curl_cffi`.
+- Modelos nuevos (`src/db/models.py`): `RegulationSet`, `RegulationLegalPokemon` (con `source`/`retrieved_at`/`verified`/`verification_note` — sí llevan estas columnas aunque el esquema ilustrativo del roadmap no las mostraba, porque CLAUDE.md exige fuente+fecha para todo dato scrapeado de roster).
+- `PokemonSpecies` ganó una columna `is_default` (bool, viene directo del JSON de PokeAPI, ya cacheado — no hizo falta re-scrapear) — necesaria para resolver correctamente la "forma por defecto" cuando no coincide con el nombre base (ej. Aegislash por defecto es `aegislash-shield`, no `aegislash`).
+- Scrapers (`src/scrapers/`): `bulbapedia.py`, `victory_road.py`, `pokemon_zone.py`, más `form_matching.py` con la lógica de emparejamiento entre las tres fuentes.
+- Orquestador `src/db/seed_regulation.py` (`python -m src.db.seed_regulation`), idempotente vía cache diario en `data/raw/{bulbapedia,victory_road,pokemon_zone}/`.
+- 16 tests (`tests/test_regulation_scrapers.py`), todos offline (wikitext/HTML de ejemplo embebido, sin red) — cubren parseo de `CPCard`, regex de Victory Road y Pokémon-Zone, y los casos límite del emparejamiento (mega X/Y, forma regional, forma de género, forma por defecto no-obvia, no resuelto).
+- **Ejecución real contra las 3 fuentes en vivo**: Regulation Set activo detectado automáticamente = **M-B** (17 jun – 2 sep 2026), coincide con Victory Road en fechas y `mega_allowed=True`. Roster: 308/310 entradas de Bulbapedia guardadas (303 verificadas cruzando con Pokémon-Zone, 5 sin verificar, 2 sin resolver — ver discrepancias abajo).
+
+Pendiente:
+- Nada bloqueante para pasar a Fase 3. Quedan 2 formas cosméticas sin fila en `pokemon_species` (Vivillon-Fancy, Meowstic-Mega) y 5 formas verificadas=false — documentado abajo, no se inventó nada para rellenarlas.
+
+Decisiones tomadas (y por qué):
+- **Granularidad de contraste "forma por forma"**: decisión explícita del usuario (se le preguntó porque implicaba riesgo de fallos silenciosos). Implementado con una tabla de alias explícita para las familias sistemáticas (Alola/Galar/Hisui/Paldea/Mega/Mega X/Mega Y/formas de Rotom/género) más comparación por tokens normalizados contra los slugs de Pokémon-Zone. Cuando no hay forma de emparejar con confianza, la fila se guarda con `verified=false` y una nota explicando por qué — nunca se adivina en silencio.
+- Detección automática del regulation activo: se listan los códigos del índice de Bulbapedia y se comprueba `start <= ahora < end` en cada uno (empezando por el más reciente), en vez de asumir que el último listado es el activo — más robusto si Bulbapedia lista el siguiente regulation por adelantado.
+- `regulation_legal_pokemon` no lleva la columna `mega_allowed_for_this` que sugería el esquema ilustrativo del roadmap: como las formas mega ya son sus propias filas en `pokemon_species` (mismo criterio que PokeAPI), que la fila exista ya dice que es legal — la columna sería redundante.
+
+Discrepancias de datos encontradas:
+- **Tauros (dex 128), forma "Combat Breed"**: es la forma por defecto según Bulbapedia/PokeAPI, pero el roster actual de Pokémon-Zone para M-B solo lista las variantes Aqua y Blaze Breed — Combat Breed no aparece en absoluto. Confirmado a mano en el HTML cacheado, no es un bug del parser. Guardado igualmente (fuente: Bulbapedia) pero con `verified=false`.
+- **Gourgeist** (dex 711): Bulbapedia/PokeAPI distinguen 4 tamaños (`average` default + `small`/`large`/`super`≡"Jumbo"); Pokémon-Zone solo tiene una entrada genérica `gourgeist` sin variantes de tamaño. Las 3 variantes no-default quedan `verified=false` (la default sí se verifica, matchea con la entrada genérica).
+- **Vivillon-Fancy** y **Meowstic-Mega**: Bulbapedia los lista en el roster de M-B pero no existe fila correspondiente en `pokemon_species` (PokeAPI no modela los patrones cosméticos de Vivillon como especies separadas; "Mega Meowstic" no es una mecánica de los juegos principales, así que PokeAPI tampoco la tiene — parece ser una mega exclusiva de Champions). No se guardaron filas en `regulation_legal_pokemon` para estos dos porque no hay `pokemon_species_id` al que apuntar sin inventarlo. Pendiente de revisar manualmente si se quiere cubrir esto en una fase posterior (probablemente al tocar movepools/ítems en Fase 3, o si Champions sigue añadiendo megas nuevas no presentes en PokeAPI).
+
+---
+
 ## Próxima sesión
-Empezar Fase 2 — Scraper del Regulation Set activo (Pokémon-Zone/Victory Road/Bulbapedia): nombre del regulation, fechas, roster legal, contraste entre ≥2 fuentes. Ahí habrá que decidir qué hacer con las formas alternativas de `pokemon_species` mencionadas arriba.
+Empezar Fase 3 — Scraper de objetos y movepools legales por regulation (Serebii/ChampsDex). Puede ser buen momento para decidir qué hacer con las 2 entradas sin `pokemon_species_id` (Vivillon-Fancy, Meowstic-Mega) si vuelven a aparecer.

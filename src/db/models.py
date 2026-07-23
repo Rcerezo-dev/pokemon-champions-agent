@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 
 from sqlmodel import Field, SQLModel
@@ -10,6 +11,7 @@ class PokemonSpecies(SQLModel, table=True):
     name: str = Field(index=True)
     types: str  # comma-separated, e.g. "fire,flying"
     base_stats_json: str  # {"hp":45,"attack":49,"defense":49,"special-attack":65,"special-defense":65,"speed":45}
+    is_default: bool = False  # PokeAPI's own flag for which form/name represents the species by default
 
 
 class Ability(SQLModel, table=True):
@@ -41,3 +43,31 @@ class TypeChart(SQLModel, table=True):
     attacking_type: str = Field(index=True)
     defending_type: str = Field(index=True)
     multiplier: float
+
+
+class RegulationSet(SQLModel, table=True):
+    """A Pokémon Champions Regulation Set (e.g. "M-B"). id is the official code."""
+
+    id: str = Field(primary_key=True)  # e.g. "M-B"
+    name: str
+    start_date: datetime
+    end_date: datetime
+    mega_allowed: bool
+    notes: str  # ruleset text (item duplication, timers, etc.)
+    source: str
+    retrieved_at: datetime
+
+
+class RegulationLegalPokemon(SQLModel, table=True):
+    """One legal species/form entry for a regulation set. Mega/regional forms are
+    their own PokemonSpecies rows (matching PokeAPI's convention), so there is no
+    separate mega_allowed_for_this flag -- the mega form's row being present here
+    already says it's legal."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    regulation_id: str = Field(foreign_key="regulationset.id", index=True)
+    pokemon_species_id: int = Field(foreign_key="pokemonspecies.id", index=True)
+    source: str
+    retrieved_at: datetime
+    verified: bool  # True only if cross-checked against a second independent source
+    verification_note: Optional[str] = None

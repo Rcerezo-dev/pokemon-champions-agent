@@ -114,6 +114,7 @@ async def seed_species(client, session: Session) -> None:
         species.name = d["name"]
         species.types = ",".join(types)
         species.base_stats_json = json.dumps(stats)
+        species.is_default = d["is_default"]
         session.add(species)
     session.commit()
     print(f"  species: {len(details)}")
