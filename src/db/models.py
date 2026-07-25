@@ -31,6 +31,13 @@ class Move(SQLModel, table=True):
     effect_text: str
 
 
+class Item(SQLModel, table=True):
+    id: int = Field(primary_key=True)
+    name: str = Field(index=True)
+    category: str
+    effect_text: str
+
+
 class Nature(SQLModel, table=True):
     id: int = Field(primary_key=True)
     name: str = Field(index=True)
@@ -70,4 +77,46 @@ class RegulationLegalPokemon(SQLModel, table=True):
     source: str
     retrieved_at: datetime
     verified: bool  # True only if cross-checked against a second independent source
+    verification_note: Optional[str] = None
+
+
+class PokemonMovepool(SQLModel, table=True):
+    """Which moves a species can use in Champions. Deliberately NOT scoped to
+    a regulation: Champions has no level-up/TM/egg distinction (confirmed by
+    inspecting Serebii's per-species move table), so a species' movepool is
+    fixed game data, not something that changes per season. What changes per
+    season is which of those moves are globally enabled -- see
+    RegulationLegalMove."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    pokemon_species_id: int = Field(foreign_key="pokemonspecies.id", index=True)
+    move_id: int = Field(foreign_key="move.id", index=True)
+    source: str
+    retrieved_at: datetime
+
+
+class RegulationLegalMove(SQLModel, table=True):
+    """Flat, species-independent list of moves enabled this regulation (e.g.
+    502 for M-B vs 467 for M-A) -- confirmed via MetaVGC's per-regulation
+    snapshot. A move usable by a given Pokémon right now is the intersection
+    of PokemonMovepool and this table for the active regulation."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    regulation_id: str = Field(foreign_key="regulationset.id", index=True)
+    move_id: int = Field(foreign_key="move.id", index=True)
+    source: str
+    retrieved_at: datetime
+    verified: bool
+    verification_note: Optional[str] = None
+
+
+class RegulationLegalItem(SQLModel, table=True):
+    """Flat list of held items enabled this regulation (148 for M-B)."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    regulation_id: str = Field(foreign_key="regulationset.id", index=True)
+    item_id: int = Field(foreign_key="item.id", index=True)
+    source: str
+    retrieved_at: datetime
+    verified: bool
     verification_note: Optional[str] = None

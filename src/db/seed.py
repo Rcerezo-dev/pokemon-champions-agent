@@ -11,7 +11,7 @@ import json
 from sqlmodel import Session, select
 
 from src.db.database import engine, init_db
-from src.db.models import Ability, Move, Nature, PokemonSpecies, TypeChart
+from src.db.models import Ability, Item, Move, Nature, PokemonSpecies, TypeChart
 from src.db.pokeapi_client import fetch_json, fetch_list, fetch_many, new_client
 
 NON_STANDARD_TYPES = {"unknown", "shadow"}
@@ -102,6 +102,21 @@ async def seed_moves(client, session: Session) -> None:
     print(f"  moves: {len(details)}")
 
 
+async def seed_items(client, session: Session) -> None:
+    listing = await fetch_list(client, "item")
+    urls = [i["url"] for i in listing]
+    details = await fetch_many(client, urls)
+    for d in details:
+        existing = session.get(Item, d["id"])
+        item = existing or Item(id=d["id"])
+        item.name = d["name"]
+        item.category = d["category"]["name"]
+        item.effect_text = _english_effect(d["effect_entries"])
+        session.add(item)
+    session.commit()
+    print(f"  items: {len(details)}")
+
+
 async def seed_species(client, session: Session) -> None:
     listing = await fetch_list(client, "pokemon")
     urls = [p["url"] for p in listing]
@@ -129,6 +144,7 @@ async def main() -> None:
             await seed_natures(client, session)
             await seed_abilities(client, session)
             await seed_moves(client, session)
+            await seed_items(client, session)
             await seed_species(client, session)
     print("Done.")
 

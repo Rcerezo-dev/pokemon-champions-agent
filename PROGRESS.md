@@ -63,5 +63,32 @@ Discrepancias de datos encontradas:
 
 ---
 
+## Fase 3 — Scraper de objetos y movepools legales
+Estado: completa
+
+Hecho:
+- Investigación previa (igual que en Fase 2, antes de escribir código): ChampsDex.com resultó ser un blog sin páginas por Pokémon (descartado); ChampDex.com (dominio distinto, casi homónimo) tiene páginas por Pokémon pero sin método de aprendizaje ni legalidad de ítems (descartado); Serebii sí tiene lo necesario pero repartido en 3 sitios (`pokemonchampions/moves.shtml`, `pokemonchampions/items.shtml`, `pokedex-champions/{slug}/`) y **sin** distinción level-up/TM/huevo (Champions la eliminó: es solo "puede usarlo o no"). Se encontró **MetaVGC** (no estaba en el roadmap) como fuente con snapshot completo y fechado por regulation (Legal Pokémon/Allowed items/Allowed moves con conteos) — sustituye a ChampsDex/ChampDex como fuente principal de esta fase, con Serebii como segunda fuente de contraste. Confirmado con el usuario antes de codificar (decisión de arquitectura no trivial).
+- **Hallazgo que cambió el esquema del roadmap**: el pool de movimientos habilitados sí varía por regulation (467 en M-A → 502 en M-B, confirmado cruzando snapshots de MetaVGC), pero es una lista plana global, no por especie — mientras que el movepool de cada especie (qué puede aprender) es fijo, no versionado por regulation. Por eso `regulation_legal_moves` quedó como tabla plana `(regulation_id, move_id)` en vez de `(regulation_id, pokemon_species_id, move_id)` como sugería el roadmap, y se creó `pokemon_movepool(pokemon_species_id, move_id)` aparte, sin `regulation_id`. La legalidad real por especie es la intersección de ambas (cálculo para la Fase 5/API, no se guarda ya cruzado).
+- Hueco cerrado de la Fase 1: `items` estaba en el esquema estático del roadmap (junto a moves/abilities) pero nunca se sembró. Añadido `Item` a `models.py` + `seed_items()` en `src/db/seed.py` reutilizando el cliente de PokeAPI ya existente (2223 ítems).
+- Scrapers nuevos: `src/scrapers/metavgc.py` (snapshot por regulation, HTML server-rendered de Next.js, sin JS necesario) y `src/scrapers/serebii_champions.py` (catálogo en vivo de moves/items + movepool por especie).
+- Orquestador `src/db/seed_movepool.py` (`python -m src.db.seed_movepool`), idempotente vía caché diario en `data/raw/{metavgc,serebii_champions}/`. Toma la regulation activa ya sembrada por la Fase 2 (no re-scrapea Bulbapedia).
+- 11 tests nuevos (`tests/test_movepool_scrapers.py`, offline), 27/27 en verde en total.
+- **Ejecución real contra las 3 fuentes en vivo** (M-B): 502/502 moves resueltos (485 verificados cruzando con Serebii, 17 sin verificar), 141/148 ítems resueltos (140 verificados, 1 sin verificar, 7 sin resolver), movepool completo para 207/207 especies actualmente legales (19215 filas `pokemon_movepool`).
+- Dos bugs reales encontrados y arreglados corriendo en vivo (no se habrían visto con datos de ejemplo): (1) un 404 de una sola especie tumbaba todo el orquestador porque `httpx.HTTPStatusError` no estaba envuelto en la excepción propia del scraper — ahora se captura por especie y el resto continúa; (2) nombres tipo "BrightPowder" (sin espacio) o "King's Rock" no cruzaban con los slugs de PokeAPI (`bright-powder`, `kings-rock`) — añadida `_match_slug()` con separación de camelCase y eliminación de apóstrofes, solo para este matching.
+
+Pendiente:
+- Nada bloqueante para pasar a Fase 4. Quedan 7 ítems sin `item_id` (mega stones exclusivas de Champions no presentes en PokeAPI, ver discrepancias) y el mapeo especie→slug de Serebii tiene overrides puntuales (`_KNOWN_FORM_SUFFIXES`, `_SEREBII_SLUG_OVERRIDES` en `seed_movepool.py`) que probablemente necesiten un entrada más si una regulation futura trae una especie con un patrón de forma-por-defecto nuevo — mismo mantenimiento que ya requería `IG_ALIAS` de la Fase 2.
+
+Decisiones tomadas (y por qué):
+- MetaVGC como fuente principal de items/moves (en vez de ChampsDex que sugería el roadmap) — confirmado con el usuario tras comprobar que ChampsDex no tiene páginas por Pokémon.
+- Esquema partido (`pokemon_movepool` sin regulation + `regulation_legal_moves`/`regulation_legal_items` planas) en vez del esquema ilustrativo del roadmap — confirmado con el usuario.
+- El movepool solo se scrapea para especies actualmente legales (207), no las 1351 de PokeAPI — no tiene sentido cachear el movepool de especies que ni siquiera están en Champions ahora mismo; se amplía por delta cuando una regulation nueva añada especies (mismo criterio de alcance que ya aplicaba Fase 2 al roster).
+
+Discrepancias de datos encontradas:
+- **7 Mega Stones exclusivas de Champions no existen en PokeAPI**: Barbaracleite, Dragalgeite, Mawileite, Sceptileite, Scolipedeite, Scraftyite, Staraptorite — corresponden a Megas nuevas que Champions introdujo para especies que nunca tuvieron Mega Evolución en los juegos principales (Mega Barbaracle, Mega Dragalge, etc., ya vistos como discrepancia similar en Fase 2 con Vivillon-Fancy/Meowstic-Mega). No se guardó `item_id` inventado — quedan fuera de `regulation_legal_items` hasta que se decida cómo modelar contenido exclusivo de Champions que no existe en PokeAPI (probablemente entradas manuales con `source="champions-exclusive"` en una fase posterior).
+- Serebii usa un slug con punto literal (`mr.rime`) en vez de guión para "Mr. Rime" — inconsistente con el resto de su propio sitio; documentado como override puntual, no una regla general.
+
+---
+
 ## Próxima sesión
-Empezar Fase 3 — Scraper de objetos y movepools legales por regulation (Serebii/ChampsDex). Puede ser buen momento para decidir qué hacer con las 2 entradas sin `pokemon_species_id` (Vivillon-Fancy, Meowstic-Mega) si vuelven a aparecer.
+Empezar Fase 4 — Scraper de meta/uso competitivo (Pikalytics/Limitless/MetaVGC).
