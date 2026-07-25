@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -43,3 +44,30 @@ class UsageOut(BaseModel):
     name: str
     usage_pct: float
     verified: bool
+
+
+class TeamMemberIn(BaseModel):
+    species: str
+    item: str | None = None
+    ability: str | None = None
+    nature: str | None = None
+    sp_spread: dict[str, int] = {}
+    moves: list[str] = []
+
+
+class TeamValidateRequest(BaseModel):
+    format: Literal["singles", "doubles"]
+    regulation_id: str | None = None
+    members: list[TeamMemberIn]
+
+
+class IssueOut(BaseModel):
+    code: str
+    message: str
+    member_index: int | None = None
+
+
+class TeamValidationOut(BaseModel):
+    valid: bool
+    regulation_id: str
+    issues: list[IssueOut]

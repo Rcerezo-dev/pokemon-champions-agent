@@ -145,5 +145,29 @@ Decisiones tomadas (y por qué): ver los 3 puntos confirmados con el usuario arr
 
 ---
 
+## Fase 6 — Motor de validación de equipos
+Estado: completa
+
+Hecho:
+- Investigación previa de dos reglas que **no** estaban ya en nuestros datos scrapeados (`RegulationSet.notes` de Fase 2 solo cubre ítems duplicados, mega por batalla y timers — nada de tamaño de equipo ni del sistema SP):
+  - **Tamaño de equipo**: confirmado en Serebii (`pokemonchampions/rankedbattle/regulationm-b.shtml`, ya fuente conocida): "Team of 3 to 6 Pokémon" (Singles) / "Team of 4 to 6 Pokémon" (Doubles).
+  - **Sistema SP** (reemplazo de EVs): 66 puntos totales, máx. 32 por stat — no lo dice ninguna fuente "oficial" que ya scrapeamos, pero coincide exactamente entre 5+ guías independientes (game8.co, ChampDex, Switchblade Gaming, BattleWise AI, GameCards), ninguna menciona variación entre regulations → tratado como mecánica fija del juego (igual que la tabla de tipos/naturalezas de Fase 1), documentada como constante con cita en el código en vez de fila de BD con fuente/fecha (no es "legalidad versionada por regulation").
+- **Descubrimiento importante que corrige el roadmap**: el roadmap dice "máx. 1 Mega" como regla de equipo, pero el texto real ya scrapeado de Bulbapedia (`RegulationSet.notes`) dice literalmente *"a player may only Mega Evolve once per battle"* — es una restricción de **uso en batalla**, no de **composición de equipo**. Un equipo puede legalmente llevar dos Pokémon Mega-capaces (cada uno legal por separado, con Piedras Mega distintas); solo no puedes evolucionar a los dos en la misma batalla. Implementar "máx. 1 Mega en el equipo" habría rechazado equipos legales de verdad — **no se implementó esa regla**, documentado en el docstring de `team_validator.py`.
+- `src/validation/team_validator.py`: motor puro (`validate_team(session, regulation, format, members) -> ValidationResult`), sin dependencias de FastAPI, reutilizable también desde el CLI (Fase 9) o tests. Reglas: tamaño de equipo por formato, Species Clause, Item Clause, especie/movimiento/ítem legal en la regulation consultada (reutiliza el cruce `pokemon_movepool ∩ regulation_legal_moves` ya usado en la Fase 5), SP por stat/total, 1-4 movimientos sin duplicados, existencia de habilidad/naturaleza (no su legalidad para esa especie en concreto — mismo hueco de Fase 5, no hay tabla especie→habilidad).
+- Endpoint `POST /team/validate` conectado en `src/api/main.py` (ahora si, la Fase 5 queda completa del todo).
+- **22 tests obligatorios** (`tests/test_team_validator.py`) con una base de datos SQLite en memoria con datos de fixture controlados a mano (no la BD real) — para poder probar cada regla con un escenario exacto e inmutable en vez de depender de qué esté legal hoy en M-B. Cubre los 22 casos: equipo válido completo, tamaño fuera de rango (por formato), especie/ítem duplicado, especie/movimiento/ítem no legal, movimiento inexistente, movimiento que la especie no puede aprender, SP fuera de rango (por stat/total/negativo), nombre de stat desconocido, demasiados movimientos, movimiento repetido, sin movimientos, habilidad/naturaleza inexistente, formato desconocido.
+- 69/69 tests en verde en total.
+- **Verificación manual real**: servidor levantado, un equipo Dobles real y legal (Garchomp/Incineroar/Kingambit/Sinistcha — los 4 más usados de M-B según la Fase 4, con movimientos/ítems/naturaleza/SP reales) validado como `"valid": true` sin ningún issue; un segundo equipo deliberadamente roto (Garchomp repetido, mismo ítem repetido, SP 40/74 total, movimiento inventado) devolvió los 6 issues esperados con mensajes correctos.
+
+Pendiente:
+- Nada bloqueante. El hueco de habilidad-por-especie (ya anotado en Fase 5) sigue sin resolver — el validador solo comprueba que la habilidad exista, no que sea válida para esa especie.
+
+Decisiones tomadas (y por qué):
+- SP (66/32) como constante citada en código, no fila de BD — no es un dato que varíe por regulation según todo lo investigado, y CLAUDE.md solo exige fuente+fecha en BD para "datos scrapeados de fuentes comunitarias" de legalidad/uso/percepción, no para mecánicas fijas del juego (mismo criterio que Fase 1 aplicó al type_chart).
+- "Máx. 1 Mega" del roadmap **no implementado tal cual** — se prioriza el texto real scrapeado sobre el resumen del roadmap, según la regla del propio CLAUDE.md de "nunca inventes... si no está confirmado, márcalo pendiente" (aquí el dato SÍ está confirmado, y contradice la regla propuesta).
+- Tests con BD en memoria + fixture a mano en vez de la BD real (a diferencia de `test_api.py` en Fase 5) — al ser una de las dos fases críticas de corrección, hace falta control exacto de cada escenario, no depender de qué esté legal hoy en el M-B real.
+
+---
+
 ## Próxima sesión
-Empezar Fase 6 — Motor de validación de equipos.
+Empezar Fase 7 — Integración con Claude (capa conversacional): exponer los endpoints de la Fase 5-6 como tools de Claude. Esta es la primera fase donde `docs/behavior_prompt.md` (que no existe todavía en el repo) hace falta de verdad — pedir al usuario el contenido antes de diseñar las tools, o escribirlo junto con él si aún no existe en ningún sitio.

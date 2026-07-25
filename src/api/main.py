@@ -1,4 +1,5 @@
-"""Internal, read-only API over the data seeded by Fases 1-4.
+"""Internal API over the data seeded by Fases 1-4, plus the Fase 6 team
+validator.
 
 Run: uvicorn src.api.main:app --reload
 """
@@ -21,12 +22,16 @@ from src.db.models import (
     UsageStat,
 )
 from src.api.schemas import (
+    IssueOut,
     MoveOut,
     PokemonDetailOut,
     PokemonSummaryOut,
     RegulationOut,
+    TeamValidateRequest,
+    TeamValidationOut,
     UsageOut,
 )
+from src.validation.team_validator import TeamMember, validate_team
 
 app = FastAPI(title="Pokémon Champions Agent API", version="0.1.0")
 
@@ -132,3 +137,18 @@ def get_top_usage(
         .limit(limit)
     ).all()
     return [UsageOut(pokemon_species_id=sp.id, name=sp.name, usage_pct=u.usage_pct, verified=u.verified) for u, sp in rows]
+
+
+@app.post("/team/validate", response_model=TeamValidationOut)
+def post_validate_team(payload: TeamValidateRequest, session: Session = Depends(get_session)):
+    reg = resolve_regulation(session, payload.regulation_id)
+    members = [
+        TeamMember(species=m.species, item=m.item, ability=m.ability, nature=m.nature, sp_spread=m.sp_spread, moves=m.moves)
+        for m in payload.members
+    ]
+    result = validate_team(session, reg, payload.format, members)
+    return TeamValidationOut(
+        valid=result.valid,
+        regulation_id=reg.id,
+        issues=[IssueOut(code=i.code, message=i.message, member_index=i.member_index) for i in result.issues],
+    )
