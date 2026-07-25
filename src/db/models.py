@@ -80,6 +80,37 @@ class RegulationLegalPokemon(SQLModel, table=True):
     verification_note: Optional[str] = None
 
 
+class UsageStat(SQLModel, table=True):
+    """% of teams running a species this regulation, from real tournament
+    results (hard data -- keep separate from community perception, see
+    CommunityMetaSnapshot planned for Fase 13)."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    regulation_id: str = Field(foreign_key="regulationset.id", index=True)
+    pokemon_species_id: int = Field(foreign_key="pokemonspecies.id", index=True)
+    usage_pct: float
+    source: str
+    retrieved_at: datetime
+    verified: bool
+    verification_note: Optional[str] = None
+
+
+class NotableTeam(SQLModel, table=True):
+    """A real team from a specific tournament placement. `team_json` holds
+    player/record/species list -- free-form since a team isn't itself a
+    query target, just a citable example to show/reference."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    regulation_id: str = Field(foreign_key="regulationset.id", index=True)
+    name: str
+    source_event: str
+    placement: int
+    team_json: str
+    source_url: str
+    source: str
+    retrieved_at: datetime
+
+
 class PokemonMovepool(SQLModel, table=True):
     """Which moves a species can use in Champions. Deliberately NOT scoped to
     a regulation: Champions has no level-up/TM/egg distinction (confirmed by

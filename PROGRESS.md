@@ -90,5 +90,33 @@ Discrepancias de datos encontradas:
 
 ---
 
+## Fase 4 — Scraper de meta/uso competitivo (datos duros)
+Estado: completa (usage_stats + notable_teams; common_sets pendiente, ver abajo)
+
+Hecho:
+- Investigación previa de las fuentes que sugería el roadmap: **Pikalytics** sí tiene sección Champions y robots.txt permisivo, pero su tabla completa de % de uso por Pokémon vive detrás de renderizado cliente (sólo su widget "Top 20 Pokemon" —rank+nombre, sin %— es HTML plano); además su landing page mezcla enlaces a un slug `regma` heredado (posible resto de una migración interna) con el dataset real y correcto `battledataregmbs3`, confirmado cruzando el texto "Format:" visible en la página. **Limitless VGC** (`limitlessvgc.com`) delega los standings/decklists reales a `standings.limitlessvgc.com`, que es una app SvelteKit sin datos en el HTML crudo (necesitaría Playwright o su API interna, no localizada). Se encontró **ChampionsMeta** (championsmeta.io, no estaba en el roadmap) como sustituto: Next.js SSR con datos reales sin JS, cita explícitamente "Data sourced from Limitless TCG", con página `/meta` (ranking de uso completo por regulation) y `/tournaments` (torneos recientes con top standings + equipo real por jugador, ya con el link a la página original de Limitless). Se descartó `championsmeta.io/teams` para `notable_teams` porque es contenido **enviado por usuarios y votado** (percepción/comunidad, no resultado de torneo real) — encaja mejor en la Fase 13, no aquí, según la regla del CLAUDE.md de separar datos duros de percepción comunitaria.
+- Modelos nuevos (`src/db/models.py`): `UsageStat`, `NotableTeam` (con `source`/`retrieved_at`/`verified` igual que las tablas de legalidad de Fases 2-3).
+- Pequeño refactor: `_get_active_regulation` (duplicado en `seed_movepool.py`) se movió a `src/db/active_regulation.py` para reutilizarse aquí también.
+- Scrapers nuevos: `src/scrapers/championsmeta.py` (primario: usage rankings + torneos con equipos) y `src/scrapers/pikalytics.py` (segundo, solo para contrastar el Top 20 por nombre).
+- Orquestador `src/db/seed_usage.py` (`python -m src.db.seed_usage`), idempotente vía caché diario en `data/raw/{championsmeta,pikalytics}/`.
+- 15 tests nuevos (offline), 38/38 en verde en total.
+- **Ejecución real en vivo** (M-B): 50/50 entradas de usage_stats resueltas (20/20 verificadas contra el Top 20 de Pikalytics — coincidencia total, buena señal de que ambas fuentes son consistentes), 160 filas en `notable_teams` desde 20 torneos recientes, con 0 Pokémon sin resolver en los equipos.
+- Un bug real de regex arreglado en vivo (no visible con datos de ejemplo simplificados hasta que reproduje la clase real): el badge de rango de cada jugador en `/tournaments` tiene más clases CSS de las que asumí (`text-yellow-400 border-yellow-600/40 bg-yellow-500/10` en vez de una sola clase `text-yellow-400`), lo que rompía `_PLAYER_ROW_RE`; corregido a un match de clase más laxo (`class="[^"]*font-bold shrink-0[^"]*"`).
+- Segundo problema real (mismo patrón que Fase 3, pero esta vez en el lado de ChampionsMeta en vez de Serebii): sus slugs a veces ponen el descriptor de forma **antes** del nombre de especie (`Alolan-Ninetales`, `Wash-Rotom`, `Eternal-Flower-Floette`) mientras PokeAPI lo pone **después** (`ninetales-alola`, `rotom-wash`, `floette-eternal`); y algunas especies (`Basculegion`, `Maushold`, `Pyroar`, `Palafin`) no tienen forma base sin sufijo en PokeAPI, igual que Aegislash/Gourgeist en Fase 3. Resuelto con `_resolve_species_id()` en `seed_usage.py`: reordena prefijos regionales/Rotom conocidos, cae a la forma `is_default` cuando el slug plano no existe, y un override puntual para Floette-Eternal.
+
+Pendiente:
+- **`common_sets`** (objeto/habilidad/naturaleza/movimientos típicos por Pokémon) no se implementó esta sesión — ChampionsMeta no expone esa granularidad en las páginas ya scrapeadas (`/meta` da solo % de uso agregado; `/tournaments` da equipos reales pero sin desglose completo de set por Pokémon en la vista de lista). Necesitaría o bien las páginas de detalle `/pokemon/{slug}` de ChampionsMeta (no investigadas todavía) o volver a intentar la ruta de "sets" de Pikalytics. Queda para retomar si se necesita antes de la Fase 11 (calculadora de daño), que sí se beneficia de tener sets típicos.
+- El resolver de slugs (`_resolve_species_id`, `_REGIONAL_PREFIX_TO_SUFFIX`, `_ROTOM_FORMS`, `_SLUG_OVERRIDES` en `seed_usage.py`) es igual de puntual que `IG_ALIAS`/`_SEREBII_SLUG_OVERRIDES` — mismo mantenimiento esperado si aparecen especies/formas nuevas.
+
+Decisiones tomadas (y por qué):
+- ChampionsMeta como fuente principal de usage_stats/notable_teams en vez de Pikalytics/Limitless directamente (que sugería el roadmap) — decisión tomada de forma autónoma (el usuario dio luz verde explícita a "seguir solo" en esta fase), documentada aquí en vez de confirmarse en vivo como en Fases 2-3.
+- `championsmeta.io/teams` (equipos votados por la comunidad) descartado para `notable_teams` y anotado como candidato de Fase 13 en vez de Fase 4 — mantiene la separación datos-duros/percepción que exige el CLAUDE.md.
+- Pikalytics se degrada a fuente de contraste (solo Top 20 por nombre) en vez de fuente primaria, porque su tabla completa de % requiere JS que no se investigó (no bloqueante: no se añadió Playwright para esto, evaluar en una sesión futura si hace falta más profundidad de Pikalytics).
+
+Discrepancias de datos encontradas:
+- Ninguna relevante sobre legalidad/datos del juego. Las dos discrepancias fueron de convención de nombres entre fuentes (ver "Hecho" arriba), no de contenido.
+
+---
+
 ## Próxima sesión
-Empezar Fase 4 — Scraper de meta/uso competitivo (Pikalytics/Limitless/MetaVGC).
+Empezar Fase 5 — API interna (FastAPI).
