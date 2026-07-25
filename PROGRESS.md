@@ -118,5 +118,32 @@ Discrepancias de datos encontradas:
 
 ---
 
+## Fase 5 — API interna (FastAPI)
+Estado: completa (solo lectura; `/team/validate` diferido a Fase 6 a propósito, ver Decisiones)
+
+Hecho:
+- 3 decisiones confirmadas con el usuario antes de escribir código (pidió explícitamente que preguntara):
+  1. `POST /team/validate` se difiere a la Fase 6 — el motor de reglas es trabajo de esa fase (tests obligatorios según CLAUDE.md), no se adelanta sin pasar por su propio checkpoint.
+  2. Los endpoints de listado devuelven resumen ligero (id/nombre/tipos/verified); el detalle completo vive en un endpoint `GET /pokemon/{id}` nuevo (no estaba en el roadmap tal cual, pero hace falta para que `/pokemon/{id}/legal-moves` tenga contexto).
+  3. `docs/behavior_prompt.md` no existe todavía en el repo (solo `docs/roadmap.md`) — se sigue sin él, ya que no se usa hasta la Fase 7 de todas formas; los endpoints se revisarán entonces si hace falta.
+- Deps nuevas: `fastapi`, `uvicorn[standard]` (ya estaban en el stack sugerido por el roadmap, sección 1 — no es un cambio de stack que requiera justificación aparte).
+- `src/api/schemas.py` (modelos de respuesta Pydantic) + `src/api/main.py` (5 endpoints):
+  - `GET /regulation/active`
+  - `GET /pokemon/legal?regulation_id=` (resumen; default = regulation activa)
+  - `GET /pokemon/{id}` (detalle: stats base, tipos, `is_default`, si es legal en la regulation consultada) — **nuevo, no estaba en el roadmap**
+  - `GET /pokemon/{id}/legal-moves?regulation_id=` — implementa el cruce `pokemon_movepool ∩ regulation_legal_moves` decidido en Fase 3 (hasta ahora vivían como dos tablas separadas sin combinar; este es el primer sitio que las junta)
+  - `GET /meta/top-usage?regulation_id=&limit=`
+- 9 tests (`tests/test_api.py`) vía `TestClient` contra la base de datos real ya sembrada (no una BD de fixtures aparte — es un proyecto de un solo entorno, montar una BD de test separada sería infraestructura innecesaria para uso local). Aserciones laxas (formas y "al menos una fila plausible"), no conteos exactos, para no romperse cada vez que un scraper se re-ejecute y cambie un número real.
+- Verificación manual real: servidor levantado con `uvicorn src.api.main:app` y probado con `curl` contra los 6 endpoints (incluyendo `/docs` y `/openapi.json`) — todas las respuestas con datos reales correctos (Charizard, Garchomp al 34.9% de uso, 308 Pokémon legales, etc.) y los 404 esperados (especie inexistente, regulation inexistente).
+- 47/47 tests en verde en total.
+
+Pendiente:
+- Cada especie no tiene sus habilidades posibles modeladas (`PokemonSpecies` nunca guardó la relación con `Ability` en la Fase 1 — el propio esquema ilustrativo del roadmap tampoco la mostraba). No bloqueaba nada hasta ahora, pero se nota en `GET /pokemon/{id}`, que no puede listar qué habilidades puede tener esa especie. Se deja pendiente hasta que una fase que la necesite de verdad la pida (probablemente Fase 6 o la 11, calculadora de daño, donde la habilidad si importa para el cálculo).
+- `POST /team/validate` — Fase 6.
+
+Decisiones tomadas (y por qué): ver los 3 puntos confirmados con el usuario arriba.
+
+---
+
 ## Próxima sesión
-Empezar Fase 5 — API interna (FastAPI).
+Empezar Fase 6 — Motor de validación de equipos.
