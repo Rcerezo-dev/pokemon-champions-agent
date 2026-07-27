@@ -5,6 +5,7 @@ __pycache__/
 *.db
 *.sqlite3
 data/raw/
+data/logs/
 .pytest_cache/
 .claude/
 *.egg-info/

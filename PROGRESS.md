@@ -192,5 +192,27 @@ Decisiones tomadas (y por qué): ver los puntos confirmados con el usuario arrib
 
 ---
 
+## Fase 8 — Automatización de scrapers
+Estado: completa
+
+Hecho:
+- Decisión confirmada con el usuario antes de codificar: el roadmap sugiere Cron/GitHub Actions, pero `*.db` y `data/raw/` están en `.gitignore` — todo vive solo en la máquina local, así que un workflow de GitHub Actions correría los scrapers contra una BD efímera del runner, no la real. Se descartó GitHub Actions y se usa **Windows Task Scheduler** (uso local personal, sin infra de CI innecesaria — mismo criterio de CLAUDE.md sección 4).
+- `src/db/run_pipeline.py` (`python -m src.db.run_pipeline`): orquesta `seed_regulation` → `seed_movepool` → `seed_usage` en orden. Cada paso captura su propio stdout (los tres ya imprimen resúmenes ricos de éxitos/discrepancias desde las Fases 2-4, no hacía falta añadir nada ahí) y sigue con el siguiente paso aunque uno falle — un fallo se registra con traceback completo en vez de abortar en silencio (regla de CLAUDE.md de fallar de forma visible). Escribe un log con timestamp por ejecución en `data/logs/pipeline_<fecha>.log` y devuelve exit code 1 si algo falló.
+- Job extra de proximidad de Regulation Set: `_check_regulation_proximity()` calcula días restantes hasta `end_date` de la regulation activa (reutiliza `get_active_regulation` de la Fase 4) y marca `WARNING` si quedan ≤7 días (constante `REGULATION_WARNING_DAYS`).
+- `scripts/register_scheduled_task.ps1`: registra una tarea diaria (09:00, working directory = raíz del proyecto) en el Task Scheduler de Windows vía `Register-ScheduledTask`, apuntando al Python del venv. No se ejecutó automáticamente — es el usuario quien la registra corriendo el script una vez, ya que crear una tarea programada es un cambio persistente del sistema fuera del repo.
+- 3 tests nuevos (`tests/test_run_pipeline.py`): captura OK/FAILED de un paso (con funciones dummy, no re-ejecuta los scrapers reales — serían lentos y dependientes de red en CI/tests) y el aviso de proximidad contra la BD real ya sembrada. 80/80 tests en verde en total.
+- Verificación manual real: `python -m src.db.run_pipeline` ejecutado contra las fuentes en vivo. Regulation (Fase 2) y movepool (Fase 3) → OK, mismos números que sus fases originales. Usage (Fase 4) → **FAILED**, ver discrepancia abajo. El paso falló limpio: el log tiene el traceback completo y, al comprobar la BD después, las 50 filas de `usage_stats` de la Fase 4 (24 jul) seguían intactas — `seed_usage.main()` lanza la excepción al hacer el fetch, antes de borrar ninguna fila existente, así que no hay pérdida ni corrupción de datos. Esto confirma que el pipeline cumple la regla de CLAUDE.md de "fallar de forma visible" tal como estaba pensado.
+
+Pendiente:
+- El usuario debe correr `scripts/register_scheduled_task.ps1` él mismo si quiere que la tarea quede programada de verdad en su máquina (no se ha registrado en esta sesión).
+- Re-ejecutar `seed_usage` (o el pipeline completo) cuando ChampionsMeta vuelva a tener datos de M-B (ver discrepancia abajo) — no bloqueante para pasar a Fase 9, los `usage_stats` existentes de la Fase 4 se mantienen válidos mientras tanto.
+
+Decisiones tomadas (y por qué): Windows Task Scheduler en vez de GitHub Actions — confirmado con el usuario (ver punto de "Hecho" arriba, motivo: BD/cache no versionados, GitHub Actions no tendría BD real contra la que trabajar).
+
+Discrepancias de datos encontradas:
+- **ChampionsMeta `/meta` no tiene datos para M-B ahora mismo** (27 jul): la página renderiza "No Regulation M-B usage rankings yet. Run the tournament sync once M-B events appear on Limitless, then this table will populate from real tournament data." — no es un cambio de estructura HTML (el parser sigue buscando las filas correctas), es que el propio backend de ChampionsMeta no tiene el ranking poblado para esta regulation en este momento, pese a que sí lo tenía el 24 jul (sesión de la Fase 4, 50/50 resueltas). Parece un problema temporal de sincronización de su lado (su propio mensaje lo sugiere). No se tocó `seed_usage.py` para "adivinar" datos alternativos — se deja fallando visiblemente hasta la próxima re-ejecución, según la regla de CLAUDE.md de no inventar ni tapar discrepancias.
+
+---
+
 ## Próxima sesión
 Pedir al usuario que configure su(s) API key(s) en `.env` (`GEMINI_API_KEY` y/o `ANTHROPIC_API_KEY`, según `LLM_PROVIDER`) y pruebe `python -m src.cli.chat` con una pregunta real para cerrar la verificación manual de la Fase 7. Después, empezar Fase 8 — Automatización de scrapers (cron/GitHub Actions ejecutando las Fases 2-4 periódicamente, logging de discrepancias).
