@@ -214,5 +214,28 @@ Discrepancias de datos encontradas:
 
 ---
 
+## Fase 9 — Interfaz de uso (CLI)
+Estado: completa
+
+Hecho:
+- Modelo nuevo `UserTeam` (`src/db/models.py`), tal cual lo esbozaba el esquema ilustrativo del roadmap (`user_teams`) — sin columnas `source`/`verified` porque un equipo del usuario no es dato scrapeado (mismo criterio ya usado en `NotableTeam` para su `team_json` libre).
+- `src/cli/main.py` (`python -m src.cli.main --help`), typer + rich, 3 comandos:
+  - `ver-meta [--regulation-id] [--limit]`: tabla rich con el % de uso real (reutiliza directamente la tabla `UsageStat` de la Fase 4).
+  - `crear-equipo`: constructor interactivo Pokémon a Pokémon (especie/objeto/habilidad/naturaleza/SP/movimientos), valida con el motor de la Fase 6 al terminar y opcionalmente guarda el equipo en `UserTeam`.
+  - `validar-equipo <nombre> [--regulation-id]`: recarga un equipo guardado y lo revalida — por defecto contra la regulation activa (no la que tenía al guardarlo), para poder detectar equipos que dejaron de ser legales tras un cambio de Regulation Set.
+  - Reutiliza `resolve_regulation` de `src/api/main.py` importándola directamente (mismo criterio in-process que ya adoptó `src/api/tools.py` en la Fase 7) en vez de duplicar la lógica de "regulation activa vs por id".
+- Deps nuevas: `typer`, `rich`.
+- 3 tests nuevos (`tests/test_cli.py`, vía `typer.testing.CliRunner` contra la BD real, mismo criterio laxo que el resto de tests de esta fase del proyecto) — cubren `ver-meta`, `validar-equipo` con nombre inexistente, y el roundtrip completo `crear-equipo` → `validar-equipo`. 83/83 tests en verde en total.
+- Verificación manual real: `crear-equipo` ejecutado a mano con un Garchomp (Doubles, Jolly, SP en Speed, Earthquake/Dragon Claw/Swords Dance/Protect) — el validador señaló correctamente `team_size` (solo 1 Pokémon) e `illegal_item` (`rocky-helmet` no está en los 141 ítems legales de M-B ya scrapeados en la Fase 3 — confirmado que es un dato real, no un bug). `validar-equipo` releyó el mismo equipo guardado y reprodujo los mismos issues. Probado también en PowerShell real (no solo en la consola de la sesión) para descartar problemas de encoding con "Pokémon" — se ve correcto.
+
+Pendiente:
+- Nada bloqueante para pasar a Fase 10. La Fase 10 (tests/mantenimiento) ya viene parcialmente cubierta por los tests que cada fase fue añadiendo por su cuenta.
+
+Decisiones tomadas (y por qué):
+- `UserTeam` como tabla SQLModel (no JSON en disco) — reutiliza la misma BD/engine que todo lo demás en vez de inventar un segundo mecanismo de persistencia, y encaja con el `user_teams` que el propio roadmap ya proponía.
+- `validar-equipo` revalida contra la regulation **activa** por defecto, no la de creación — es lo que le da valor a tener el comando separado de `crear-equipo` (que ya valida al momento de crear): detectar cuando un Regulation Set nuevo invalida un equipo guardado.
+
+---
+
 ## Próxima sesión
 Pedir al usuario que configure su(s) API key(s) en `.env` (`GEMINI_API_KEY` y/o `ANTHROPIC_API_KEY`, según `LLM_PROVIDER`) y pruebe `python -m src.cli.chat` con una pregunta real para cerrar la verificación manual de la Fase 7. Después, empezar Fase 8 — Automatización de scrapers (cron/GitHub Actions ejecutando las Fases 2-4 periódicamente, logging de discrepancias).

@@ -48,6 +48,10 @@ pytest                              # 80+ tests, todos offline o contra la BD ya
 uvicorn src.api.main:app --reload   # API en http://127.0.0.1:8000/docs
 
 python -m src.cli.chat              # chat con tools (Claude o Gemini, según LLM_PROVIDER)
+
+python -m src.cli.main ver-meta                 # top de uso real en torneos
+python -m src.cli.main crear-equipo             # construir un equipo paso a paso
+python -m src.cli.main validar-equipo <nombre>  # revalidar un equipo ya guardado
 ```
 
 ## Automatización (Fase 8, opcional)

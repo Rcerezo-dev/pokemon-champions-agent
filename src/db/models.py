@@ -151,3 +151,16 @@ class RegulationLegalItem(SQLModel, table=True):
     retrieved_at: datetime
     verified: bool
     verification_note: Optional[str] = None
+
+
+class UserTeam(SQLModel, table=True):
+    """A team built by the user via `crear-equipo` (Fase 9). Not scraped data
+    -- no source/verified columns, same reasoning NotableTeam already uses
+    for `team_json`: free-form since a team isn't itself a query target."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    created_at: datetime
+    regulation_id: str = Field(foreign_key="regulationset.id", index=True)
+    name: str
+    format: str
+    team_json: str
