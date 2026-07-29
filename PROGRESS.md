@@ -287,5 +287,21 @@ Decisiones tomadas (y por qué):
 
 ---
 
+## Sesión post-Fase 11 — columna `in_champions`
+Motivada por tu pregunta de si `pokemon_species` guarda solo el roster de Champions o los ~1350 de PokeAPI (era lo segundo). Confirmado contigo antes de tocar el esquema: mantener la tabla completa (no borrar nada — una regulation futura puede reactivar cualquier especie, y borrar filas rompería `UsageStat`/`NotableTeam` de regulations pasadas), y añadir un flag booleano en vez de filtrar solo en la capa de API.
+
+Hecho:
+- `PokemonSpecies.in_champions: bool` (`src/db/models.py`) — a diferencia de `RegulationLegalPokemon` (legalidad de UNA regulation concreta), este flag es acumulado: se pone `True` la primera vez que la especie aparece en el roster legal de CUALQUIER regulation ya scrapeada (M-A, M-B, la que sea), y nunca se resetea a `False` si luego rota fuera de la regulation activa — confirmado contigo que esa era la semántica que querías, no "legal ahora mismo" (eso ya lo daba `RegulationLegalPokemon`).
+- `seed_regulation.py` marca `in_champions=True` para cada especie resuelta (verificada o no) cada vez que corre — se automantiene solo, no hay que tocarlo a mano, así que no puede quedar desactualizado como sí le pasaría a un flag puesto una sola vez.
+- `GET /pokemon/{id}` / tool `get_pokemon_detail` ahora devuelven `in_champions` junto a `legal_in_regulation` (que ya existía) — distinción explicada en `docs/behavior_prompt.md`, que de paso ganó la fila que le faltaba para `get_pokemon_detail` (estaba definida en `tools.py` desde la Fase 7 pero nunca se documentó en el prompt de comportamiento).
+- No se tocó `calculate_damage`: a propósito sigue sin comprobar legalidad de ningún tipo (ni `RegulationLegalPokemon` ni `in_champions`), igual que ya no comprobaba legalidad de ítems/movimientos — es una calculadora para cualquier build que YA has decidido, no un segundo validador.
+- Cambio de esquema en una tabla ya existente, sin Alembic todavía (roadmap lo deja "más adelante") — se documenta aquí en vez de escribir una migración ad-hoc: si tienes ya una `data/pokemon_champions.db` sembrada, hace falta borrarla y volver a sembrar (`python -m src.db.seed` → `seed_regulation` o `run_pipeline`) para que SQLite tenga la columna nueva; `SQLModel.metadata.create_all()` no altera tablas ya existentes.
+- 86/86 tests offline en verde tras el cambio (mismos 16 fallos preexistentes de siempre por falta de BD real sembrada en este checkout, ver Fase 10 — ninguno nuevo).
+
+Pendiente:
+- Nada bloqueante. Si en algún momento se quiere consultar "todo lo que ha sido de Champions alguna vez" desde el CLI/chat (no solo por id), se puede añadir un endpoint/tool `GET /pokemon/champions-roster` que filtre por `in_champions=true` — no se ha añadido porque nadie lo ha pedido todavía.
+
+---
+
 ## Próxima sesión
-Confirmar si `.venv`/`data/pokemon_champions.db` existen en tu máquina habitual (si no, re-sembrar antes de fiarse de la suite completa de Fases 5-9 y de los tests de `/damage/calculate` contra la BD real). Correr `npm install` en `src/damage_calc/node/` si no se ha hecho ya en esa máquina. Re-correr `pytest -m live` en unos días para ver si ChampionsMeta ya salió de su estado "cached data/temporarily unavailable" (Fase 10). Después, empezar Fase 12 — búsqueda semántica sobre el roster legal (embeddings + Chroma/LanceDB, búsqueda híbrida filtro-estructurado + similitud).
+Borrar y re-sembrar `data/pokemon_champions.db` en tu máquina habitual para que recoja la columna `in_champions` nueva (ver arriba) antes de fiarte de la suite completa de Fases 5-9/11. Correr `npm install` en `src/damage_calc/node/` si no se ha hecho ya en esa máquina. Re-correr `pytest -m live` en unos días para ver si ChampionsMeta ya salió de su estado "cached data/temporarily unavailable" (Fase 10). Después, empezar Fase 12 — búsqueda semántica sobre el roster legal (embeddings + Chroma/LanceDB, búsqueda híbrida filtro-estructurado + similitud).

@@ -12,6 +12,11 @@ class PokemonSpecies(SQLModel, table=True):
     types: str  # comma-separated, e.g. "fire,flying"
     base_stats_json: str  # {"hp":45,"attack":49,"defense":49,"special-attack":65,"special-defense":65,"speed":45}
     is_default: bool = False  # PokeAPI's own flag for which form/name represents the species by default
+    in_champions: bool = False  # True if ever seen legal in ANY scraped Regulation Set (accumulates across
+    # regulations, set by seed_regulation.py -- never flipped back to False when a Pokémon rotates out of the
+    # *current* regulation). Distinct from RegulationLegalPokemon, which is scoped to one specific regulation --
+    # this is "has this species ever been part of the Champions format at all", for filtering out PokeAPI's
+    # ~1000+ species that Champions has simply never included (see PROGRESS.md, session after Fase 11).
 
 
 class Ability(SQLModel, table=True):

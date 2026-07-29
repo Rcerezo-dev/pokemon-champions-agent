@@ -69,6 +69,7 @@ def main() -> None:
         species_by_name = {s.name: s.id for s in species_rows}
         default_species_by_name = {s.name: s.id for s in species_rows if s.is_default}
         species_by_id = {s.id: s.name for s in species_rows}
+        species_obj_by_id = {s.id: s for s in species_rows}
 
         reg = session.get(RegulationSet, detail.code) or RegulationSet(id=detail.code)
         reg.name = f"Regulation Set {detail.code}"
@@ -103,6 +104,9 @@ def main() -> None:
                     verification_note=result.verify_note,
                 )
             )
+            # Accumulates across regulations -- only ever flips False->True, never
+            # reset, so it survives this species rotating out of a later regulation.
+            species_obj_by_id[result.species_id].in_champions = True
             if result.verified:
                 verified_count += 1
             else:

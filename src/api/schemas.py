@@ -26,7 +26,8 @@ class PokemonDetailOut(BaseModel):
     types: list[str]
     base_stats: dict[str, int]
     is_default: bool
-    legal_in_regulation: bool
+    in_champions: bool  # ever legal in any scraped Regulation Set (not just the one queried)
+    legal_in_regulation: bool  # legal specifically in the regulation this request asked about
 
 
 class MoveOut(BaseModel):

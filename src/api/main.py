@@ -101,6 +101,7 @@ def get_pokemon_detail(pokemon_id: int, regulation_id: Optional[str] = Query(def
         types=sp.types.split(","),
         base_stats=json.loads(sp.base_stats_json),
         is_default=sp.is_default,
+        in_champions=sp.in_champions,
         legal_in_regulation=legal is not None,
     )
 
