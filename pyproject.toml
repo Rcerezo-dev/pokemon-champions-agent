@@ -11,6 +11,7 @@ dependencies = [
     "google-genai>=2.0",
     "typer>=0.12",
     "rich>=13.0",
+    "lancedb>=0.34",
 ]
 
 [project.optional-dependencies]
@@ -19,6 +20,6 @@ dev = ["pytest>=8.0"]
 [tool.pytest.ini_options]
 pythonpath = ["."]
 markers = [
-    "live: hits real external websites; excluded by default, run explicitly with `pytest -m live`",
+    "live: hits a real external service (scraper websites, or an LLM API needing a key in .env); excluded by default, run explicitly with `pytest -m live`",
 ]
 addopts = "-m 'not live'"

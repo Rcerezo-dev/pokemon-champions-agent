@@ -109,3 +109,13 @@ class DamageResultOut(BaseModel):
     ko_chance_text: str
     ko_chance: float | None
     modifiers: list[str]
+
+
+class SemanticSearchResultOut(BaseModel):
+    pokemon_species_id: int
+    name: str
+    types: list[str]
+    doc_text: str
+    usage_pct: float | None
+    verified_usage: bool
+    distance: float

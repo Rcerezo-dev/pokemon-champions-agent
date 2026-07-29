@@ -25,6 +25,20 @@ class Ability(SQLModel, table=True):
     effect_text: str
 
 
+class PokemonAbility(SQLModel, table=True):
+    """Which abilities a species can actually have -- gap noted since Fase 5
+    (PokemonSpecies never captured this). Backfilled in seed.py from the same
+    cached PokeAPI /pokemon/{id} response that seed_species() already reads
+    (its "abilities" list was just never persisted), so this costs no new
+    scraping. Needed by Fase 12 to avoid inventing which abilities belong to
+    a species in its semantic-search document."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    pokemon_species_id: int = Field(foreign_key="pokemonspecies.id", index=True)
+    ability_id: int = Field(foreign_key="ability.id", index=True)
+    is_hidden: bool
+
+
 class Move(SQLModel, table=True):
     id: int = Field(primary_key=True)
     name: str = Field(index=True)

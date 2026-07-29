@@ -30,10 +30,13 @@ from src.api.schemas import (
     PokemonDetailOut,
     PokemonSummaryOut,
     RegulationOut,
+    SemanticSearchResultOut,
     TeamValidateRequest,
     TeamValidationOut,
     UsageOut,
 )
+from src.semantic.embeddings import EmbeddingError
+from src.semantic.search import semantic_search_pokemon
 from src.validation.team_validator import TeamMember, validate_team
 
 app = FastAPI(title="Pokémon Champions Agent API", version="0.1.0")
@@ -178,3 +181,27 @@ def post_calculate_damage(payload: DamageCalculateRequest, session: Session = De
         ko_chance=result.ko_chance,
         modifiers=result.modifiers,
     )
+
+
+@app.get("/pokemon/semantic-search", response_model=list[SemanticSearchResultOut])
+def get_semantic_search(
+    query: str = Query(...),
+    type: Optional[str] = Query(default=None),
+    limit: int = Query(default=10, ge=1, le=50),
+):
+    try:
+        results = semantic_search_pokemon(query, type_filter=type, limit=limit)
+    except (EmbeddingError, ValueError) as e:
+        raise HTTPException(422, str(e))
+    return [
+        SemanticSearchResultOut(
+            pokemon_species_id=r.pokemon_species_id,
+            name=r.name,
+            types=r.types,
+            doc_text=r.doc_text,
+            usage_pct=r.usage_pct,
+            verified_usage=r.verified_usage,
+            distance=r.distance,
+        )
+        for r in results
+    ]

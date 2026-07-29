@@ -6,6 +6,7 @@ __pycache__/
 *.sqlite3
 data/raw/
 data/logs/
+data/lancedb/
 .pytest_cache/
 .claude/
 *.egg-info/

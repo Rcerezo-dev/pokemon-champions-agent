@@ -15,6 +15,7 @@ from src.api.main import (
     get_legal_moves,
     get_legal_pokemon,
     get_pokemon_detail,
+    get_semantic_search,
     get_top_usage,
     post_calculate_damage,
     post_validate_team,
@@ -179,6 +180,31 @@ TOOLS: list[dict] = [
             "required": ["attacker", "defender", "move"],
         },
     },
+    {
+        "name": "semantic_search_pokemon",
+        "description": (
+            "Busqueda en lenguaje natural sobre el roster legal de la regulation "
+            "para la que se construyo el indice (normalmente la activa -- ver "
+            "PROGRESS.md Fase 12 si hace falta confirmar cuando se regenero). "
+            "Filtra primero por tipo si se da, y ordena por similitud semantica "
+            "sobre ese subconjunto. Cada resultado devuelve el texto completo del "
+            "documento indexado (stats, habilidades, movimientos legales, % de "
+            "uso) para poder justificar por que aparecio. No sustituye a "
+            "get_legal_pokemon para listar todo el roster ni a validate_team "
+            "para confirmar legalidad -- es para preguntas abiertas tipo 'que "
+            "Pokemon tiene una habilidad que boostea el ataque con clima "
+            "soleado'."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string"},
+                "type_filter": {"type": "string", "description": "Tipo exacto, p.ej. 'fire'. Opcional."},
+                "limit": {"type": "integer", "description": "Maximo de resultados (por defecto 10)."},
+            },
+            "required": ["query"],
+        },
+    },
 ]
 
 
@@ -229,6 +255,13 @@ def run_tool(name: str, tool_input: dict[str, Any]) -> dict[str, Any]:
                     **({"field": tool_input["field"]} if "field" in tool_input else {}),
                 )
                 return post_calculate_damage(payload, session=session).model_dump(mode="json")
+            if name == "semantic_search_pokemon":
+                results = get_semantic_search(
+                    query=tool_input["query"],
+                    type=tool_input.get("type_filter"),
+                    limit=tool_input.get("limit", 10),
+                )
+                return {"results": [r.model_dump(mode="json") for r in results]}
             return {"error": f"Unknown tool '{name}'."}
         except HTTPException as e:
             return {"error": e.detail}

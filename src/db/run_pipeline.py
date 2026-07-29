@@ -20,7 +20,7 @@ from pathlib import Path
 
 from sqlmodel import Session
 
-from src.db import seed_movepool, seed_regulation, seed_usage
+from src.db import seed_embeddings, seed_movepool, seed_regulation, seed_usage
 from src.db.active_regulation import get_active_regulation
 from src.db.database import engine
 
@@ -31,6 +31,7 @@ STEPS = [
     ("regulation (Fase 2)", seed_regulation.main),
     ("movepool (Fase 3)", seed_movepool.main),
     ("usage (Fase 4)", seed_usage.main),
+    ("semantic index (Fase 12)", seed_embeddings.main),
 ]
 
 

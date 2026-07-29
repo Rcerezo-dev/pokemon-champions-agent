@@ -36,8 +36,9 @@ python -m src.db.seed              # Fase 1: species/moves/abilities/natures/ite
 python -m src.db.seed_regulation   # Fase 2: Regulation Set activo + roster legal
 python -m src.db.seed_movepool     # Fase 3: items/movepool legales
 python -m src.db.seed_usage        # Fase 4: % de uso real + equipos de torneos
+python -m src.db.seed_embeddings   # Fase 12: indice de busqueda semantica (necesita GEMINI_API_KEY)
 
-# o los tres últimos de una vez, con logging (Fase 8):
+# o los cuatro ultimos de una vez, con logging (Fase 8):
 python -m src.db.run_pipeline
 ```
 
@@ -47,7 +48,7 @@ el mismo día no vuelve a golpear la web.
 ## Probar que funciona
 
 ```bash
-pytest                              # 80+ tests, todos offline o contra la BD ya sembrada
+pytest                              # 100+ tests, todos offline o contra la BD ya sembrada
 pytest -m live                      # opcional: smoke tests contra las webs reales (Fase 10)
 
 uvicorn src.api.main:app --reload   # API en http://127.0.0.1:8000/docs
@@ -77,7 +78,9 @@ powershell -ExecutionPolicy Bypass -File scripts\register_scheduled_task.ps1
   /validation      motor de validación de equipos (Fase 6)
   /damage_calc    calculadora de daño (Fase 11): stats.py (formula SP) + calculator.py
                   (bridge a node/calc.js, que adapta la libreria real @smogon/calc)
-  /api            FastAPI + definición de tools para el LLM (Fase 5/7/11)
+  /semantic       búsqueda semántica (Fase 12): documents.py (texto por especie) +
+                  embeddings.py (Gemini) + store.py (LanceDB, filtro + similitud)
+  /api            FastAPI + definición de tools para el LLM (Fase 5/7/11/12)
   /cli            chat REPL (Fase 7)
 /data/raw         HTML/JSON cacheado por scraper y fecha (gitignored)
 /tests

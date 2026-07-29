@@ -11,7 +11,7 @@ import json
 from sqlmodel import Session, select
 
 from src.db.database import engine, init_db
-from src.db.models import Ability, Item, Move, Nature, PokemonSpecies, TypeChart
+from src.db.models import Ability, Item, Move, Nature, PokemonAbility, PokemonSpecies, TypeChart
 from src.db.pokeapi_client import fetch_json, fetch_list, fetch_many, new_client
 
 NON_STANDARD_TYPES = {"unknown", "shadow"}
@@ -121,6 +121,7 @@ async def seed_species(client, session: Session) -> None:
     listing = await fetch_list(client, "pokemon")
     urls = [p["url"] for p in listing]
     details = await fetch_many(client, urls)
+    ability_id_by_name = {a.name: a.id for a in session.exec(select(Ability)).all()}
     for d in details:
         types = [t["type"]["name"] for t in sorted(d["types"], key=lambda t: t["slot"])]
         stats = {s["stat"]["name"]: s["base_stat"] for s in d["stats"]}
@@ -132,7 +133,19 @@ async def seed_species(client, session: Session) -> None:
         species.is_default = d["is_default"]
         session.add(species)
     session.commit()
-    print(f"  species: {len(details)}")
+
+    ability_rows = 0
+    for d in details:
+        for row in session.exec(select(PokemonAbility).where(PokemonAbility.pokemon_species_id == d["id"])):
+            session.delete(row)
+        for a in d["abilities"]:
+            ability_id = ability_id_by_name.get(a["ability"]["name"])
+            if ability_id is None:  # shouldn't happen -- seed_abilities() already ran -- but don't silently skip
+                raise RuntimeError(f"Species {d['name']}: unknown ability '{a['ability']['name']}' -- run seed_abilities first.")
+            session.add(PokemonAbility(pokemon_species_id=d["id"], ability_id=ability_id, is_hidden=a["is_hidden"]))
+            ability_rows += 1
+    session.commit()
+    print(f"  species: {len(details)} ({ability_rows} species-ability rows)")
 
 
 async def main() -> None:

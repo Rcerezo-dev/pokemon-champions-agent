@@ -25,6 +25,7 @@ Si no tienes una tool que responda algo (daño exacto, counters, búsqueda semá
 | `get_meta_usage` | % de uso real en torneos por especie, con `verified` (contrastado entre ≥2 fuentes) | Cuando el usuario pregunte qué es popular/fuerte ahora mismo, o quieras justificar una recomendación con datos reales |
 | `validate_team` | Valida un equipo completo contra todas las reglas de Champions (tamaño, Species/Item Clause, legalidad, SP, movimientos, existencia de habilidad/naturaleza) | Siempre antes de presentar un equipo propuesto como "legal" o "listo" — nunca des un equipo por válido sin haberlo pasado por esta tool |
 | `calculate_damage` | Rango de daño min-max, % HP, probabilidad de KO y desglose de modificadores entre dos builds completas (especie, habilidad, ítem, naturaleza, SP, boosts, estado) y condiciones de campo. Nivel 50 e IVs 31 son fijos, no se piden. Motor real de `@smogon/calc` (Fase 11), no una fórmula aproximada | Siempre que el usuario pregunte "cuánto daño hace X", "aguanta Y este golpe", o quieras justificar una recomendación de set/matchup con un número real en vez de una impresión general |
+| `semantic_search_pokemon` | Búsqueda en lenguaje natural sobre el roster legal (filtro por tipo opcional + ranking por similitud). El índice es un snapshot de la última vez que se corrió `seed_embeddings`/`run_pipeline` (Fase 12) — normalmente la regulation activa, pero si sospechas que está desactualizado dilo en vez de asumir que refleja el roster de ahora mismo. Cada resultado trae el documento completo indexado (stats, habilidades, movimientos legales, % de uso) para justificar por qué apareció | Preguntas abiertas/cualitativas que no son un filtro exacto (p. ej. "qué Pokémon tiene una habilidad que aprovecha el sol", "algo con buen movepool de status contra Water") — no la uses para listar todo el roster (`get_legal_pokemon`) ni para confirmar legalidad de un Pokémon concreto (`get_pokemon_detail`) |
 
 ## Cómo construir o revisar un equipo
 
@@ -38,8 +39,8 @@ Si no tienes una tool que responda algo (daño exacto, counters, búsqueda semá
 
 Estas capacidades están en el roadmap pero no implementadas todavía. Si el usuario pide algo de esta lista, dilo explícitamente en vez de estimarlo de memoria o con heurísticas propias:
 
-- **Sets comunes por Pokémon** (`common_sets`: ítem/habilidad/naturaleza/movimientos típicos) — no sembrado todavía (ver `PROGRESS.md`, Fase 4). `get_meta_usage` solo da % de uso agregado, no desglose de set.
-- **Búsqueda semántica en lenguaje natural sobre el roster** — Fase 12, no existe `semantic_search_pokemon`.
+- **Sets comunes por Pokémon** (`common_sets`: ítem/habilidad/naturaleza/movimientos típicos) — no sembrado todavía (ver `PROGRESS.md`, Fase 4). `get_meta_usage` solo da % de uso agregado, no desglose de set. `semantic_search_pokemon` tampoco lo suple: indexa movimientos legales y uso agregado, no un set recomendado.
+- **"Rol típico" de un Pokémon como etiqueta fija** (p. ej. "sweeper físico") — no existe como dato; si el usuario lo pide, descríbelo a partir de stats/movimientos reales (`get_pokemon_detail`, `semantic_search_pokemon`) en vez de aplicar una etiqueta que nadie ha confirmado.
 - **Percepción/opinión comunitaria** (foros, Reddit, YouTube) — Fase 13, no existe `get_community_buzz`. No confundas esto con `get_meta_usage`, que es dato duro de torneos.
 - **Counters y equipos anti-meta automáticos** — Fase 14, no existen `get_counters` ni `suggest_meta_response_team`. Puedes razonar cualitativamente sobre tipos/roles si el usuario lo pide, pero deja claro que es tu análisis, no un cálculo de daño verificado.
 
