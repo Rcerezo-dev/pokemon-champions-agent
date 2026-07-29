@@ -71,3 +71,40 @@ class TeamValidationOut(BaseModel):
     valid: bool
     regulation_id: str
     issues: list[IssueOut]
+
+
+class DamageBuildIn(BaseModel):
+    species: str
+    ability: str | None = None
+    item: str | None = None
+    nature: str | None = None
+    status: str = ""
+    sp_spread: dict[str, int] = {}
+    boosts: dict[str, int] = {}
+
+
+class FieldConditionsIn(BaseModel):
+    game_type: Literal["singles", "doubles"] = "singles"
+    weather: str | None = None
+    terrain: str | None = None
+    attacker_side: dict = {}
+    defender_side: dict = {}
+
+
+class DamageCalculateRequest(BaseModel):
+    attacker: DamageBuildIn
+    defender: DamageBuildIn
+    move: str
+    field: FieldConditionsIn = FieldConditionsIn()
+
+
+class DamageResultOut(BaseModel):
+    damage_rolls: list[int]
+    damage_min: int
+    damage_max: int
+    defender_max_hp: int
+    hp_pct_min: float
+    hp_pct_max: float
+    ko_chance_text: str
+    ko_chance: float | None
+    modifiers: list[str]

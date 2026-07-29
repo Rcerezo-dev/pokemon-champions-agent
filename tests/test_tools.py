@@ -52,3 +52,24 @@ def test_validate_team_unknown_regulation_returns_error():
 def test_unknown_tool_name_returns_error():
     result = run_tool("not_a_real_tool", {})
     assert "error" in result
+
+
+def test_calculate_damage_charizard_flamethrower_vs_blastoise():
+    result = run_tool(
+        "calculate_damage",
+        {
+            "attacker": {"species": "charizard", "sp_spread": {"special-attack": 32}},
+            "defender": {"species": "blastoise"},
+            "move": "flamethrower",
+        },
+    )
+    assert result["damage_min"] > 0
+    assert result["damage_min"] <= result["damage_max"] <= result["defender_max_hp"] * 5  # sane upper bound
+
+
+def test_calculate_damage_unknown_species_returns_error():
+    result = run_tool(
+        "calculate_damage",
+        {"attacker": {"species": "not-a-real-pokemon"}, "defender": {"species": "blastoise"}, "move": "flamethrower"},
+    )
+    assert "error" in result

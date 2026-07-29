@@ -9,3 +9,4 @@ data/logs/
 .pytest_cache/
 .claude/
 *.egg-info/
+node_modules/

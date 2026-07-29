@@ -16,10 +16,29 @@ from src.api.main import (
     get_legal_pokemon,
     get_pokemon_detail,
     get_top_usage,
+    post_calculate_damage,
     post_validate_team,
 )
-from src.api.schemas import TeamValidateRequest
+from src.api.schemas import DamageCalculateRequest, TeamValidateRequest
 from src.db.database import engine
+
+_DAMAGE_BUILD_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "species": {"type": "string"},
+        "ability": {"type": "string"},
+        "item": {"type": "string"},
+        "nature": {"type": "string"},
+        "status": {"type": "string", "description": "'', 'brn', 'par', 'psn', 'tox', 'slp' o 'frz'."},
+        "sp_spread": {"type": "object", "additionalProperties": {"type": "integer"}},
+        "boosts": {
+            "type": "object",
+            "additionalProperties": {"type": "integer"},
+            "description": "Boosts de fase -6..+6 por stat (attack/defense/special-attack/special-defense/speed).",
+        },
+    },
+    "required": ["species"],
+}
 
 TOOLS: list[dict] = [
     {
@@ -127,6 +146,39 @@ TOOLS: list[dict] = [
             "required": ["format", "members"],
         },
     },
+    {
+        "name": "calculate_damage",
+        "description": (
+            "Calcula el rango de dano (min-max), %HP, probabilidad de KO y el "
+            "desglose de modificadores aplicados para un movimiento entre dos "
+            "builds completas (especie, habilidad, item, naturaleza, SP, boosts de "
+            "fase, estado) bajo unas condiciones de campo dadas. Nivel 50 e IVs 31 "
+            "son fijos (regla de Champions), no se piden como parametro. Usa el "
+            "motor real de @smogon/calc -- si una especie/objeto/habilidad/movimiento "
+            "no existe en el juego (o es contenido exclusivo de Champions no "
+            "modelado, p.ej. una Mega Piedra propia de Champions) devuelve error en "
+            "vez de un numero inventado; nunca calcules dano de memoria."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "attacker": _DAMAGE_BUILD_SCHEMA,
+                "defender": _DAMAGE_BUILD_SCHEMA,
+                "move": {"type": "string"},
+                "field": {
+                    "type": "object",
+                    "properties": {
+                        "game_type": {"type": "string", "enum": ["singles", "doubles"]},
+                        "weather": {"type": "string", "description": "'Sun', 'Rain', 'Sand' o 'Snow'."},
+                        "terrain": {"type": "string", "description": "'Electric', 'Grassy', 'Misty' o 'Psychic'."},
+                        "attacker_side": {"type": "object", "description": "p.ej. {\"isTailwind\": true}."},
+                        "defender_side": {"type": "object", "description": "p.ej. {\"isReflect\": true}."},
+                    },
+                },
+            },
+            "required": ["attacker", "defender", "move"],
+        },
+    },
 ]
 
 
@@ -169,6 +221,14 @@ def run_tool(name: str, tool_input: dict[str, Any]) -> dict[str, Any]:
                     members=tool_input["members"],
                 )
                 return post_validate_team(payload, session=session).model_dump(mode="json")
+            if name == "calculate_damage":
+                payload = DamageCalculateRequest(
+                    attacker=tool_input["attacker"],
+                    defender=tool_input["defender"],
+                    move=tool_input["move"],
+                    **({"field": tool_input["field"]} if "field" in tool_input else {}),
+                )
+                return post_calculate_damage(payload, session=session).model_dump(mode="json")
             return {"error": f"Unknown tool '{name}'."}
         except HTTPException as e:
             return {"error": e.detail}

@@ -10,6 +10,7 @@ from typing import Optional
 from fastapi import Depends, FastAPI, HTTPException, Query
 from sqlmodel import Session, select
 
+from src.damage_calc.calculator import DamageBuild, DamageCalcError, FieldConditions, calculate_damage
 from src.db.active_regulation import get_active_regulation
 from src.db.database import engine
 from src.db.models import (
@@ -22,6 +23,8 @@ from src.db.models import (
     UsageStat,
 )
 from src.api.schemas import (
+    DamageCalculateRequest,
+    DamageResultOut,
     IssueOut,
     MoveOut,
     PokemonDetailOut,
@@ -151,4 +154,26 @@ def post_validate_team(payload: TeamValidateRequest, session: Session = Depends(
         valid=result.valid,
         regulation_id=reg.id,
         issues=[IssueOut(code=i.code, message=i.message, member_index=i.member_index) for i in result.issues],
+    )
+
+
+@app.post("/damage/calculate", response_model=DamageResultOut)
+def post_calculate_damage(payload: DamageCalculateRequest, session: Session = Depends(get_session)):
+    attacker = DamageBuild(**payload.attacker.model_dump())
+    defender = DamageBuild(**payload.defender.model_dump())
+    field = FieldConditions(**payload.field.model_dump())
+    try:
+        result = calculate_damage(session, attacker, defender, payload.move, field)
+    except DamageCalcError as e:
+        raise HTTPException(422, str(e))
+    return DamageResultOut(
+        damage_rolls=result.damage_rolls,
+        damage_min=result.damage_min,
+        damage_max=result.damage_max,
+        defender_max_hp=result.defender_max_hp,
+        hp_pct_min=result.hp_pct_min,
+        hp_pct_max=result.hp_pct_max,
+        ko_chance_text=result.ko_chance_text,
+        ko_chance=result.ko_chance,
+        modifiers=result.modifiers,
     )

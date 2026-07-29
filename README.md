@@ -22,6 +22,10 @@ pip install -e ".[dev]"
 copy .env.example .env        # Windows
 # cp .env.example .env        # Linux/Mac
 # edita .env: ANTHROPIC_API_KEY y/o GEMINI_API_KEY, LLM_PROVIDER=claude|gemini
+
+# Fase 11 (calculadora de daño) necesita Node.js instalado y adapta la
+# libreria real @smogon/calc via un subproceso -- ver PROGRESS.md Fase 11
+cd src/damage_calc/node && npm install && cd ../../..
 ```
 
 La base de datos (`data/pokemon_champions.db`) y el cache crudo de scraping (`data/raw/`)
@@ -71,7 +75,9 @@ powershell -ExecutionPolicy Bypass -File scripts\register_scheduled_task.ps1
   /scrapers       un módulo por fuente
   /db             modelos SQLModel + scripts de seed + orquestador (Fase 8)
   /validation      motor de validación de equipos (Fase 6)
-  /api            FastAPI + definición de tools para el LLM (Fase 5/7)
+  /damage_calc    calculadora de daño (Fase 11): stats.py (formula SP) + calculator.py
+                  (bridge a node/calc.js, que adapta la libreria real @smogon/calc)
+  /api            FastAPI + definición de tools para el LLM (Fase 5/7/11)
   /cli            chat REPL (Fase 7)
 /data/raw         HTML/JSON cacheado por scraper y fecha (gitignored)
 /tests

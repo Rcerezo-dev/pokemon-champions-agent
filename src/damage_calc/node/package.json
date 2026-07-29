@@ -1,0 +1,11 @@
+{
+  "name": "pokemon-champions-agent-damage-calc",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Thin JSON-over-stdio bridge to @smogon/calc for src/damage_calc/calculator.py (Fase 11). Not a standalone package.",
+  "main": "calc.js",
+  "type": "commonjs",
+  "dependencies": {
+    "@smogon/calc": "^0.11.0"
+  }
+}

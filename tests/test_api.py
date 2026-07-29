@@ -76,3 +76,26 @@ def test_top_usage_respects_limit():
 def test_unknown_regulation_id_404s():
     r = client.get("/pokemon/legal?regulation_id=Z-NOPE")
     assert r.status_code == 404
+
+
+def test_calculate_damage_charizard_flamethrower_vs_blastoise():
+    r = client.post(
+        "/damage/calculate",
+        json={
+            "attacker": {"species": "charizard", "sp_spread": {"special-attack": 32}},
+            "defender": {"species": "blastoise"},
+            "move": "flamethrower",
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert 0 < body["damage_min"] <= body["damage_max"]
+    assert body["defender_max_hp"] > 0
+
+
+def test_calculate_damage_unknown_species_422s():
+    r = client.post(
+        "/damage/calculate",
+        json={"attacker": {"species": "not-a-real-pokemon"}, "defender": {"species": "blastoise"}, "move": "flamethrower"},
+    )
+    assert r.status_code == 422
