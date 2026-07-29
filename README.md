@@ -44,6 +44,7 @@ el mismo día no vuelve a golpear la web.
 
 ```bash
 pytest                              # 80+ tests, todos offline o contra la BD ya sembrada
+pytest -m live                      # opcional: smoke tests contra las webs reales (Fase 10)
 
 uvicorn src.api.main:app --reload   # API en http://127.0.0.1:8000/docs
 

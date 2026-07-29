@@ -237,5 +237,29 @@ Decisiones tomadas (y por qué):
 
 ---
 
+## Fase 10 — Pruebas y mantenimiento
+Estado: completa
+
+Hecho:
+- El roadmap pedía "tests unitarios del validador (crítico)" — ya hecho en la Fase 6 — y "smoke tests de scrapers con selectores robustos y alertas si el parser falla". Cada scraper (Fases 2-4) ya lanzaba su propia excepción `*ScrapeError` cuando un selector no encuentra nada (regla de CLAUDE.md de fallar de forma visible, aplicada desde el principio); lo que faltaba era una comprobación deliberada y periódica contra los sitios reales, separada de sembrar la BD.
+- `tests/test_smoke_scrapers.py`: 10 tests (uno por función pública de cada scraper: bulbapedia, victory_road, pokemon_zone, metavgc, serebii ×3, championsmeta ×2, pikalytics), marcados `@pytest.mark.live` — golpean los sitios reales de verdad, no fixtures. Excluidos de la ejecución normal de `pytest` (`addopts = "-m 'not live'"` en `pyproject.toml`), se corren aparte con `pytest -m live`.
+- `src/db/smoke_test_scrapers.py` (`python -m src.db.smoke_test_scrapers`): script standalone que llama a las mismas funciones, sin tocar la BD para nada (más rápido y ligero que `run_pipeline.py`, que sí escribe en BD y solo distingue fallos a nivel de sus 3 pasos, no por fuente individual). Escribe `data/logs/smoke_<fecha>.log` con OK/FAILED por fuente y el traceback completo si falla — mismo patrón de alerta que ya usaba `run_pipeline.py` desde la Fase 8.
+- Detectado que esta sesión partía de un checkout sin `.venv` ni `data/` (ninguno de los dos viaja en git, correcto según `.gitignore`, pero tampoco estaban ya creados en esta máquina/sesión) — se creó `.venv` (Python 3.11) e instalaron dependencias para poder verificar. La suite offline (66 tests que no dependen de la BD ya sembrada: `type_effectiveness`, `regulation_scrapers`, `movepool_scrapers`, `usage_scrapers`, `team_validator`) pasa en verde. Los tests que sí requieren la BD real ya sembrada (`test_api.py`, `test_cli.py`, `test_tools.py`, `test_run_pipeline.py`) fallan aquí solo porque no hay `data/pokemon_champions.db` en este checkout — no es una regresión de esta sesión, es que faltaba sembrar. No se ejecutó el pipeline completo de seeding para no dar por hecho que había que reconstruir esa base de datos sin comentarlo contigo primero.
+- **Ejecución real de `pytest -m live`**: 8/10 fuentes OK (bulbapedia, victory_road, pokemon_zone, metavgc, las 3 de serebii, pikalytics). 2/10 fallaron — ver discrepancia abajo.
+
+Pendiente:
+- Confirmar en tu máquina habitual si `.venv`/`data/pokemon_champions.db` existen ahí (deberían, según sesiones anteriores) — si no, hay que re-sembrar (`python -m src.db.seed` → `seed_regulation` → `seed_movepool` → `seed_usage`, o `run_pipeline`) antes de poder correr la suite completa en verde.
+- Revisar `championsmeta.py` cuando su sitio confirme que ya no está en el estado "cached data — live results temporarily unavailable" (ver discrepancia) — probablemente no haga falta cambiar nada si es solo una caída temporal de su backend, pero si sigue así varias sesiones más habrá que investigar si de verdad cambiaron a un layout que no expone las tarjetas de torneo como HTML plano.
+- Nada bloqueante para pasar a Fase 11.
+
+Decisiones tomadas (y por qué):
+- `pytest -m live` como opt-in (no en la ejecución por defecto) — necesitan red real contra sitios de terceros, no tiene sentido que un `pytest` normal dependa de que 7 webs externas estén arriba en ese momento.
+- Script standalone (`smoke_test_scrapers.py`) además de los tests de pytest, no solo uno de los dos — los tests de pytest son para verificación manual/CI-style durante desarrollo; el script es para programarlo aparte (Task Scheduler, más barato que el pipeline completo porque no escribe en BD) como chequeo de salud más frecuente que el pipeline diario de la Fase 8.
+
+Discrepancias de datos encontradas:
+- **ChampionsMeta (`/meta` y `/tournaments`) sin datos utilizables para M-B ahora mismo (29 jul)**: `/meta` sigue mostrando el mismo hueco que la Fase 8 ya documentó ("Regulation M-B data will appear here as tournament results are imported" — texto distinto al de entonces, mismo hueco de fondo). `/tournaments` es nuevo: la página dice literalmente "Showing cached data — live results temporarily unavailable" y ya no tiene ninguna tarjeta `<div class="rounded-2xl border...">` en el HTML crudo — los datos parecen haberse movido a un payload de Next.js (`self.__next_f.push(...)`) mientras su backend está caído. No se tocó el parser para adivinar el nuevo formato mientras el sitio admite explícitamente que está en un estado degradado/temporal — se deja fallando de forma visible (regla de CLAUDE.md), a revisar si persiste.
+
+---
+
 ## Próxima sesión
-Pedir al usuario que configure su(s) API key(s) en `.env` (`GEMINI_API_KEY` y/o `ANTHROPIC_API_KEY`, según `LLM_PROVIDER`) y pruebe `python -m src.cli.chat` con una pregunta real para cerrar la verificación manual de la Fase 7. Después, empezar Fase 8 — Automatización de scrapers (cron/GitHub Actions ejecutando las Fases 2-4 periódicamente, logging de discrepancias).
+Confirmar si `.venv`/`data/pokemon_champions.db` existen en tu máquina habitual (si no, re-sembrar antes de fiarse de la suite completa). Re-correr `pytest -m live` (o `python -m src.db.smoke_test_scrapers`) en unos días para ver si ChampionsMeta ya salió de su estado "cached data/temporarily unavailable"; si persiste varias sesiones, investigar si de verdad cambió de formato de renderizado. Después, empezar Fase 11 — motor de cálculo de daño (adaptación de `@smogon/calc`, SP en vez de EVs, nivel 50 fijo).
